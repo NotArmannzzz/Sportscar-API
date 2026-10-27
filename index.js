@@ -104,28 +104,15 @@ app.get("/api/cars/:id", async (req, res) => {
 // ===================================================
 app.post("/api/cars", async (req, res) => {
   try {
-    const { nama, merek, tahun, harga, spek, gambar } = req.body;
+    const { nama, merek, deskripsi } = req.body;
 
-    if (typeof nama !== "string" || !nama.trim() || typeof merek !== "string" || !merek.trim() || tahun === undefined || tahun === null || tahun === "" || harga === undefined || harga === null || harga === "") {
+    if (typeof nama !== "string" || !nama.trim() || typeof merek !== "string" || !merek.trim()) {
       return res.status(400).json({
-        message: "Field nama, merek, tahun, dan harga wajib diisi.",
+        message: "Field nama dan merek wajib diisi.",
       });
     }
 
-    const tahunAngka = Number(tahun);
-    const hargaAngka = Number(harga);
-
-    if (!Number.isInteger(tahunAngka) || tahunAngka < 1886 || !Number.isSafeInteger(hargaAngka) || hargaAngka < 0) {
-      return res.status(400).json({
-        message: "Tahun atau harga tidak valid.",
-      });
-    }
-
-    const [hasil] = await db.query(
-      `INSERT INTO cars (nama, merek, tahun, harga, spek, gambar)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-      [nama.trim(), merek.trim(), tahunAngka, hargaAngka, spek || "", gambar || ""]
-    );
+    const [hasil] = await db.query("INSERT INTO cars (nama, merek, deskripsi) VALUES (?, ?, ?)", [nama.trim(), merek.trim(), deskripsi || ""]);
 
     const [cars] = await db.query("SELECT * FROM cars WHERE id = ?", [hasil.insertId]);
 
@@ -155,18 +142,6 @@ app.put("/api/cars/:id", async (req, res) => {
       });
     }
 
-    const kolomDiizinkan = ["nama", "merek", "tahun", "harga", "spek", "gambar"];
-
-    const perubahan = [];
-    const nilai = [];
-
-    for (const kolom of kolomDiizinkan) {
-      if (req.body[kolom] !== undefined) {
-        perubahan.push(`${kolom} = ?`);
-        nilai.push(req.body[kolom]);
-      }
-    }
-
     const [mobilAda] = await db.query("SELECT * FROM cars WHERE id = ?", [id]);
 
     if (mobilAda.length === 0) {
@@ -175,42 +150,40 @@ app.put("/api/cars/:id", async (req, res) => {
       });
     }
 
+    const { nama, merek, deskripsi } = req.body;
+
+    if (nama !== undefined && (typeof nama !== "string" || !nama.trim())) {
+      return res.status(400).json({
+        message: "Nama mobil tidak boleh kosong.",
+      });
+    }
+
+    if (merek !== undefined && (typeof merek !== "string" || !merek.trim())) {
+      return res.status(400).json({
+        message: "Merek mobil tidak boleh kosong.",
+      });
+    }
+
+    const perubahan = [];
+    const nilai = [];
+
+    if (nama !== undefined) {
+      perubahan.push("nama = ?");
+      nilai.push(nama.trim());
+    }
+
+    if (merek !== undefined) {
+      perubahan.push("merek = ?");
+      nilai.push(merek.trim());
+    }
+
+    if (deskripsi !== undefined) {
+      perubahan.push("deskripsi = ?");
+      nilai.push(deskripsi);
+    }
+
     if (perubahan.length > 0) {
-      if (req.body.nama !== undefined && (typeof req.body.nama !== "string" || !req.body.nama.trim())) {
-        return res.status(400).json({
-          message: "Nama mobil tidak boleh kosong.",
-        });
-      }
-
-      if (req.body.merek !== undefined && (typeof req.body.merek !== "string" || !req.body.merek.trim())) {
-        return res.status(400).json({
-          message: "Merek mobil tidak boleh kosong.",
-        });
-      }
-
-      if (req.body.tahun !== undefined && (!Number.isInteger(Number(req.body.tahun)) || Number(req.body.tahun) < 1886)) {
-        return res.status(400).json({
-          message: "Tahun mobil tidak valid.",
-        });
-      }
-
-      if (req.body.harga !== undefined && (!Number.isSafeInteger(Number(req.body.harga)) || Number(req.body.harga) < 0)) {
-        return res.status(400).json({
-          message: "Harga mobil tidak valid.",
-        });
-      }
-
-      if (req.body.nama !== undefined) {
-        nilai[kolomDiizinkan.indexOf("nama") === -1 ? 0 : perubahan.findIndex((item) => item.startsWith("nama ="))] = req.body.nama.trim();
-      }
-
-      if (req.body.merek !== undefined) {
-        const indexMerek = perubahan.findIndex((item) => item.startsWith("merek ="));
-        nilai[indexMerek] = req.body.merek.trim();
-      }
-
       nilai.push(id);
-
       await db.query(`UPDATE cars SET ${perubahan.join(", ")} WHERE id = ?`, nilai);
     }
 
